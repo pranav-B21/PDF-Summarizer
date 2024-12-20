@@ -24,6 +24,9 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from typing import List, Tuple, Dict, Any, Optional
 
+import warnings
+warnings.filterwarnings('ignore')
+
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 # Streamlit page configuration
@@ -42,7 +45,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-def create_vector_db(file_upload) -> Chroma:
+def create_vector_db(file_upload):
     """
     Create a vector database from an uploaded PDF file.
 
@@ -79,7 +82,7 @@ def create_vector_db(file_upload) -> Chroma:
     logger.info(f"Temporary directory {temp_dir} removed")
     return vector_db
 
-def process_question(question: str, vector_db: Chroma, selected_model: str) -> str:
+def process_question(question: str, vector_db: Chroma, selected_model: str):
     """
     Process a user question using the vector database and selected language model.
 
@@ -135,7 +138,7 @@ def process_question(question: str, vector_db: Chroma, selected_model: str) -> s
     return response
 
 @st.cache_data
-def extract_all_pages_as_images(file_upload) -> List[Any]:
+def extract_all_pages_as_images(file_upload):
     """
     Extract all pages from a PDF file as images.
 
@@ -152,7 +155,7 @@ def extract_all_pages_as_images(file_upload) -> List[Any]:
     logger.info("PDF pages extracted as images")
     return pdf_pages
 
-def delete_vector_db(vector_db: Optional[Chroma]) -> None:
+def delete_vector_db(vector_db):
     """
     Delete the vector database and clear related session state.
 
@@ -172,7 +175,7 @@ def delete_vector_db(vector_db: Optional[Chroma]) -> None:
         st.error("No vector database found to delete.")
         logger.warning("Attempted to delete vector DB, but none was found")
 
-def main() -> None:
+def main():
     """
     Main function to run the Streamlit application.
     """
@@ -194,10 +197,9 @@ def main() -> None:
         st.session_state["use_sample"] = False
 
     # Model selection
-    
     # Add checkbox for sample PDF
     use_sample = col1.toggle(
-        "Use sample PDF (Scammer Agent Paper)", 
+        "Use sample PDF", 
         key="sample_checkbox"
     )
     
@@ -281,8 +283,7 @@ def main() -> None:
 
         # Display chat history
         for i, message in enumerate(st.session_state["messages"]):
-            avatar = "🤖" if message["role"] == "assistant" else "😎"
-            with message_container.chat_message(message["role"], avatar=avatar):
+            with message_container.chat_message(message["role"]):
                 st.markdown(message["content"])
 
         # Chat input and processing
@@ -290,11 +291,11 @@ def main() -> None:
             try:
                 # Add user message to chat
                 st.session_state["messages"].append({"role": "user", "content": prompt})
-                with message_container.chat_message("user", avatar="😎"):
+                with message_container.chat_message("user"):
                     st.markdown(prompt)
 
                 # Process and display assistant response
-                with message_container.chat_message("assistant", avatar="🤖"):
+                with message_container.chat_message("assistant"):
                     with st.spinner(":green[processing...]"):
                         if st.session_state["vector_db"] is not None:
                             response = process_question(
@@ -311,12 +312,11 @@ def main() -> None:
                     )
 
             except Exception as e:
-                st.error(e, icon="⛔️")
+                st.error(e)
                 logger.error(f"Error processing prompt: {e}")
         else:
             if st.session_state["vector_db"] is None:
                 st.warning("Upload a PDF file or use the sample PDF to begin chat...")
-
-
+                
 if __name__ == "__main__":
     main()
