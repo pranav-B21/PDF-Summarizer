@@ -29,14 +29,14 @@ warnings.filterwarnings('ignore')
 
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
-# Streamlit page configuration
+#streamlit page configuration
 st.set_page_config(
     page_title="Ollama PDF RAG Streamlit UI",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Logging configuration
+#logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -193,60 +193,20 @@ def main():
         st.session_state["messages"] = []
     if "vector_db" not in st.session_state:
         st.session_state["vector_db"] = None
-    if "use_sample" not in st.session_state:
-        st.session_state["use_sample"] = False
 
-    # Model selection
-    # Add checkbox for sample PDF
-    use_sample = col1.toggle(
-        "Use sample PDF", 
-        key="sample_checkbox"
+    # File uploader
+    file_upload = col1.file_uploader(
+        "Upload a PDF file ↓", 
+        type="pdf", 
+        accept_multiple_files=False
     )
-    
-    # Clear vector DB if switching between sample and upload
-    if use_sample != st.session_state.get("use_sample"):
-        if st.session_state["vector_db"] is not None:
-            st.session_state["vector_db"].delete_collection()
-            st.session_state["vector_db"] = None
-            st.session_state["pdf_pages"] = None
-        st.session_state["use_sample"] = use_sample
 
-    if use_sample:
-        # Use the sample PDF
-        sample_path = "scammer-agent.pdf"
-        if os.path.exists(sample_path):
-            if st.session_state["vector_db"] is None:
-                with st.spinner("Processing sample PDF..."):
-                    loader = PyPDFLoader(file_path=sample_path)
-                    data = loader.load()
-                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=7500, chunk_overlap=100)
-                    chunks = text_splitter.split_documents(data)
-                    st.session_state["vector_db"] = Chroma.from_documents(
-                        documents=chunks,
-                        embedding=OllamaEmbeddings(model="nomic-embed-text"),
-                        collection_name="myRAG"
-                    )
-                    # Open and display the sample PDF
-                    with pdfplumber.open(sample_path) as pdf:
-                        pdf_pages = [page.to_image().original for page in pdf.pages]
-                        st.session_state["pdf_pages"] = pdf_pages
-        else:
-            st.error("Sample PDF file not found in the current directory.")
-    else:
-        # Regular file upload with unique key
-        file_upload = col1.file_uploader(
-            "Upload a PDF file ↓", 
-            type="pdf", 
-            accept_multiple_files=False,
-            key="pdf_uploader"
-        )
-
-        if file_upload:
-            if st.session_state["vector_db"] is None:
-                with st.spinner("Processing uploaded PDF..."):
-                    st.session_state["vector_db"] = create_vector_db(file_upload)
-                    pdf_pages = extract_all_pages_as_images(file_upload)
-                    st.session_state["pdf_pages"] = pdf_pages
+    if file_upload:
+        if st.session_state["vector_db"] is None:
+            with st.spinner("Processing uploaded PDF..."):
+                st.session_state["vector_db"] = create_vector_db(file_upload)
+                pdf_pages = extract_all_pages_as_images(file_upload)
+                st.session_state["pdf_pages"] = pdf_pages
 
     # Display PDF if pages are available
     if "pdf_pages" in st.session_state and st.session_state["pdf_pages"]:
@@ -256,22 +216,19 @@ def main():
             min_value=100, 
             max_value=1000, 
             value=700, 
-            step=50,
-            key="zoom_slider"
+            step=50
         )
 
         # Display PDF pages
         with col1:
             with st.container(height=410, border=True):
-                # Removed the key parameter from st.image()
                 for page_image in st.session_state["pdf_pages"]:
                     st.image(page_image, width=zoom_level)
 
     # Delete collection button
     delete_collection = col1.button(
         "⚠️ Delete collection", 
-        type="secondary",
-        key="delete_button"
+        type="secondary"
     )
 
     if delete_collection:
@@ -287,7 +244,7 @@ def main():
                 st.markdown(message["content"])
 
         # Chat input and processing
-        if prompt := st.chat_input("Enter a prompt here...", key="chat_input"):
+        if prompt := st.chat_input("Enter a prompt here..."):
             try:
                 # Add user message to chat
                 st.session_state["messages"].append({"role": "user", "content": prompt})
@@ -316,7 +273,7 @@ def main():
                 logger.error(f"Error processing prompt: {e}")
         else:
             if st.session_state["vector_db"] is None:
-                st.warning("Upload a PDF file or use the sample PDF to begin chat...")
+                st.warning("Upload a PDF file to begin chat...")
                 
 if __name__ == "__main__":
     main()
