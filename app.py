@@ -5,6 +5,7 @@ This application allows users to upload a PDF, process it,
 and then ask questions about the content using a selected language model.
 """
 
+#imports all from the virtual environment
 import streamlit as st
 import logging
 import os
@@ -25,8 +26,9 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from typing import List, Tuple, Dict, Any, Optional
 
 import warnings
-warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore') #ignore warnings
 
+#enviorment variables
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 #streamlit page configuration
@@ -43,17 +45,12 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+#logger
 logger = logging.getLogger(__name__)
 
 def create_vector_db(file_upload):
     """
     Create a vector database from an uploaded PDF file.
-
-    Args:
-        file_upload (st.UploadedFile): Streamlit file upload object containing the PDF.
-
-    Returns:
-        Chroma: A vector store containing the processed document chunks.
     """
     logger.info(f"Creating vector DB from file upload: {file_upload.name}")
     temp_dir = tempfile.mkdtemp()
@@ -62,14 +59,15 @@ def create_vector_db(file_upload):
     with open(path, "wb") as f:
         f.write(file_upload.getvalue())
         logger.info(f"File saved to temporary path: {path}")
-        loader = PyPDFLoader(path)
+        loader = PyPDFLoader(path) #load the pdf file using Pypdfloader
         data = loader.load()
 
+    #split document into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=7500, chunk_overlap=100)
     chunks = text_splitter.split_documents(data)
     logger.info("Document split into chunks")
 
-    # Updated embeddings configuration
+    #updated embeddings configuration
     embeddings = OllamaEmbeddings(model="nomic-embed-text")
     vector_db = Chroma.from_documents(
         documents=chunks,
@@ -82,21 +80,13 @@ def create_vector_db(file_upload):
     logger.info(f"Temporary directory {temp_dir} removed")
     return vector_db
 
-def process_question(question: str, vector_db: Chroma, selected_model: str):
+def process_question(question, vector_db, selected_model):
     """
     Process a user question using the vector database and selected language model.
-
-    Args:
-        question (str): The user's question.
-        vector_db (Chroma): The vector database containing document embeddings.
-        selected_model (str): The name of the selected language model.
-
-    Returns:
-        str: The generated response to the user's question.
     """
     logger.info(f"Processing question: {question} using model: {selected_model}")
     
-    # Initialize LLM
+    #initialize LLM
     llm = ChatOllama(model=selected_model)
     
     # Query prompt template
@@ -110,22 +100,23 @@ def process_question(question: str, vector_db: Chroma, selected_model: str):
         Original question: {question}""",
     )
 
-    # Set up retriever
+    #set up retriever which fetches relevant context from the vector database.
     retriever = MultiQueryRetriever.from_llm(
         vector_db.as_retriever(), 
         llm,
         prompt=QUERY_PROMPT
     )
 
-    # RAG prompt template
+    #RAG prompt template
     template = """Answer the question based ONLY on the following context:
     {context}
     Question: {question}
     """
-
+    #retrieved context and the original question are then 
+    #formatted into a prompt using a ChatPromptTemplate.
     prompt = ChatPromptTemplate.from_template(template)
 
-    # Create chain
+    #create chain
     chain = (
         {"context": retriever, "question": RunnablePassthrough()}
         | prompt
@@ -141,12 +132,6 @@ def process_question(question: str, vector_db: Chroma, selected_model: str):
 def extract_all_pages_as_images(file_upload):
     """
     Extract all pages from a PDF file as images.
-
-    Args:
-        file_upload (st.UploadedFile): Streamlit file upload object containing the PDF.
-
-    Returns:
-        List[Any]: A list of image objects representing each page of the PDF.
     """
     logger.info(f"Extracting all pages as images from file: {file_upload.name}")
     pdf_pages = []
@@ -158,9 +143,6 @@ def extract_all_pages_as_images(file_upload):
 def delete_vector_db(vector_db):
     """
     Delete the vector database and clear related session state.
-
-    Args:
-        vector_db (Optional[Chroma]): The vector database to be deleted.
     """
     logger.info("Deleting vector DB")
     if vector_db is not None:
@@ -181,20 +163,20 @@ def main():
     """
     st.subheader("Ollama PDF Reader", divider="gray", anchor=False)
 
-    # Get available models
+    #get available models
     models_info = ollama.list()
     selected_model = "llama3"
 
-    # Create layout
+    #create layout
     col1, col2 = st.columns([1.5, 2])
 
-    # Initialize session state
+    #initialize session state
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
     if "vector_db" not in st.session_state:
         st.session_state["vector_db"] = None
 
-    # File uploader
+    #file uploader
     file_upload = col1.file_uploader(
         "Upload a PDF file ↓", 
         type="pdf", 
@@ -208,7 +190,7 @@ def main():
                 pdf_pages = extract_all_pages_as_images(file_upload)
                 st.session_state["pdf_pages"] = pdf_pages
 
-    # Display PDF if pages are available
+    #display PDF if pages are available
     if "pdf_pages" in st.session_state and st.session_state["pdf_pages"]:
         # PDF display controls
         zoom_level = col1.slider(
@@ -219,13 +201,13 @@ def main():
             step=50
         )
 
-        # Display PDF pages
+        #display PDF pages
         with col1:
             with st.container(height=410, border=True):
                 for page_image in st.session_state["pdf_pages"]:
                     st.image(page_image, width=zoom_level)
 
-    # Delete collection button
+    #delete collection button
     delete_collection = col1.button(
         "⚠️ Delete collection", 
         type="secondary"
@@ -234,24 +216,24 @@ def main():
     if delete_collection:
         delete_vector_db(st.session_state["vector_db"])
 
-    # Chat interface
+    #chat interface
     with col2:
         message_container = st.container(height=500, border=True)
 
-        # Display chat history
+        #display chat history
         for i, message in enumerate(st.session_state["messages"]):
             with message_container.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # Chat input and processing
+        #chat input and processing
         if prompt := st.chat_input("Enter a prompt here..."):
             try:
-                # Add user message to chat
+                #add user message to chat
                 st.session_state["messages"].append({"role": "user", "content": prompt})
                 with message_container.chat_message("user"):
                     st.markdown(prompt)
 
-                # Process and display assistant response
+                #process and display assistant response
                 with message_container.chat_message("assistant"):
                     with st.spinner(":green[processing...]"):
                         if st.session_state["vector_db"] is not None:
@@ -262,7 +244,7 @@ def main():
                         else:
                             st.warning("Please upload a PDF file first.")
 
-                # Add assistant response to chat history
+                #add assistant response to chat history
                 if st.session_state["vector_db"] is not None:
                     st.session_state["messages"].append(
                         {"role": "assistant", "content": response}
