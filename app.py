@@ -108,8 +108,7 @@ def process_question(question, vector_db, selected_model):
     )
 
     #RAG prompt template
-    template = """Answer the question based ONLY on the following context:
-    {context}
+    template = """Answer the question based ONLY on the following context: {context}
     Question: {question}
     """
     #retrieved context and the original question are then 
