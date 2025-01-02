@@ -18,7 +18,11 @@ This Streamlit application leverages Ollama and LangChain to create a PDF-based 
 4. Pull Ollama:
      ```bash
    ollama pull llama3
-6. Install required packages:
+5. Start/create a python enviorment
+     ```bash
+   python -m myenv
+   source myenv/bin/activate
+7. Install required packages:
    ```bash
    pip install streamlit pdfplumber ollama langchain
 
